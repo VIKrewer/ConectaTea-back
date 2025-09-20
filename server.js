@@ -271,8 +271,14 @@ app.get("/api/resources/online", async (req, res) => {
   }
 });
 
+// rota de teste/saúde
+app.get("/api", (req, res) => {
+  res.json({ ok: true, message: "API rodando 🚀" });
+});
+
 /* ---------------------- START ---------------------- */
 app.listen(PORT, () =>
   console.log(`✅ API rodando em http://localhost:${PORT}`)
 );
+
 
