@@ -7,21 +7,42 @@ import { initDB } from "./db.js";
 import fetch from "node-fetch";
 
 const app = express();
-const PORT = 4000;
-const SECRET = "conectatea-secret";
+const PORT = process.env.PORT || 4000;
+const SECRET = process.env.JWT_SECRET || "conectatea-secret";
 
-app.use(cors());
+/* ---------------------- CORS ---------------------- */
+const allowedOrigins = [
+  "http://localhost:5173", // dev
+  "https://conectatea-frontend.vercel.app", // vercel prod
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true); // permitir requests sem "origin" (ex: Postman)
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      console.warn("❌ CORS bloqueado para origem:", origin);
+      return callback(new Error("Não permitido por CORS"), false);
+    }
+  },
+  credentials: true,
+}));
+
 app.use(express.json());
 
+/* ---------------------- DB ---------------------- */
 let db;
 initDB().then((database) => {
   db = database;
+  console.log("✅ Banco inicializado com sucesso!");
 });
 
-// Middleware para validar token
+/* ---------------------- Middleware ---------------------- */
 function auth(req, res, next) {
   const header = req.headers["authorization"];
   if (!header) return res.status(401).json({ message: "Token ausente" });
+
   const token = header.split(" ")[1];
   try {
     const decoded = jwt.verify(token, SECRET);
@@ -74,20 +95,23 @@ app.get("/api/resources", async (req, res) => {
 });
 
 /* ---------------------- COMMUNITY ---------------------- */
-// Listar posts (com comentários)
 app.get("/api/community/posts", async (req, res) => {
-  const posts = await db.all("SELECT * FROM posts ORDER BY id DESC");
-  const comments = await db.all("SELECT * FROM comments ORDER BY id ASC");
+  try {
+    const posts = await db.all("SELECT * FROM posts ORDER BY id DESC");
+    const comments = await db.all("SELECT * FROM comments ORDER BY id ASC");
 
-  const postsWithComments = posts.map((p) => ({
-    ...p,
-    comments: comments.filter((c) => c.post_id === p.id),
-  }));
+    const postsWithComments = posts.map((p) => ({
+      ...p,
+      comments: comments.filter((c) => c.post_id === p.id),
+    }));
 
-  res.json(postsWithComments);
+    res.json(postsWithComments);
+  } catch (err) {
+    console.error("Erro GET /api/community/posts:", err);
+    res.status(500).json({ message: "Erro ao carregar posts" });
+  }
 });
 
-// Criar post
 app.post("/api/community/posts", auth, async (req, res) => {
   const { content } = req.body;
   if (!content) return res.status(400).json({ message: "Conteúdo vazio" });
@@ -106,7 +130,6 @@ app.post("/api/community/posts", auth, async (req, res) => {
   });
 });
 
-// Curtir post
 app.post("/api/community/posts/:id/like", auth, async (req, res) => {
   const id = req.params.id;
   await db.run("UPDATE posts SET likes = likes + 1 WHERE id=?", [id]);
@@ -114,7 +137,6 @@ app.post("/api/community/posts/:id/like", auth, async (req, res) => {
   res.json(updated);
 });
 
-// Comentar post
 app.post("/api/community/posts/:id/comment", auth, async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ message: "Comentário vazio" });
@@ -214,11 +236,7 @@ app.delete("/api/checklists/:id", auth, async (req, res) => {
   res.json({ success: true });
 });
 
-app.listen(PORT, () =>
-  console.log(`✅ API rodando em http://localhost:${PORT}`)
-);
-
-// rota para buscar artigos sobre autismo no PubMed
+/* ---------------------- PUBMED ---------------------- */
 app.get("/api/resources/online", async (req, res) => {
   try {
     const q = req.query.q || "autism";
@@ -252,3 +270,8 @@ app.get("/api/resources/online", async (req, res) => {
     res.status(500).json({ message: "Erro ao buscar artigos" });
   }
 });
+
+/* ---------------------- START ---------------------- */
+app.listen(PORT, () =>
+  console.log(`✅ API rodando em http://localhost:${PORT}`)
+);
