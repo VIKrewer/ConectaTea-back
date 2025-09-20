@@ -7,7 +7,7 @@ import { initDB } from "./db.js";
 import fetch from "node-fetch";
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 10000;
 const SECRET = process.env.JWT_SECRET || "conectatea-secret";
 
 /* ---------------------- CORS ---------------------- */
@@ -275,3 +275,4 @@ app.get("/api/resources/online", async (req, res) => {
 app.listen(PORT, () =>
   console.log(`✅ API rodando em http://localhost:${PORT}`)
 );
+
